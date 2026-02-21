@@ -1,0 +1,17 @@
+Generate a new GitHub repo to deploy the following resources to Azure:
+
+1) API Management: "/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.ApiManagement/service/apim-poc-my"
+
+In API Management, include the following:
+- API from App Service called "SalesPOC-API"
+- MCP Server from API "SalesPOC-API" and enable all get methods only as Tools in MCP Server
+
+2) API Center: "/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.ApiCenter/services/api-center-poc-my"
+Add "apim-poc-my" as a Production environment in "api-center-poc-my"
+
+For all these resources, if they already exist, don't overwrite them in workflow file for GitHub actions used to deploy to Azure
+
+For MCP Server, add all relevant policies for token limit, protect from negative prompts, hate speech, harmful content, reasonable rate limiter. 
+For "api-center-poc-my" - API Analysis for "SalesPOC-API", create a new ruleset other than Microsoft default analyzer called "Spectral" that has all rules from spectral except for restricting putting dates in string fields. Call the new ruleset as "CustomRulesetPOC" and use it for linting of "SalesPOC-API". 
+
+Also add a readme file to explain the project and architecture, file structure.

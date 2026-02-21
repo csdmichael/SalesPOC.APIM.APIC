@@ -1,0 +1,40 @@
+name: Deploy APIM + API Center
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Run Deployment Script
+        shell: pwsh
+        run: |
+          ./scripts/deploy.ps1 `
+            -SubscriptionId "86b37969-9445-49cf-b03f-d8866235171c" `
+            -ResourceGroupName "ai-myaacoub" `
+            -ApimServiceName "apim-poc-my" `
+            -ApiCenterName "api-center-poc-my" `
+            -AppServiceName "salespoc-api" `
+            -ApiDisplayName "SalesPOC-API" `
+            -ApiId "salespoc-api" `
+            -ApiPath "salespoc-api" `
+            -McpServerId "salespoc-api-mcp" `
+            -ApiCenterEnvironmentId "production" `
+            -ApiCenterIntegrationName "apim-poc-my-prod" `
+            -ApiVersionId "v1" `
+            -ApiDefinitionId "openapi" `
+            -ApiDeploymentId "production" `
+            -ApiAnalyzerConfigName "customrulesetpoc"

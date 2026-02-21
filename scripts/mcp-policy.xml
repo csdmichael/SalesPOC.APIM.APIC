@@ -1,0 +1,78 @@
+<policies>
+  <inbound>
+    <base />
+
+    <set-variable name="requestBody" value="@(context.Request.Body.As<string>(preserveContent: true))" />
+    <set-variable name="requestLength" value="@(((string)context.Variables[\"requestBody\"]).Length)" />
+
+    <choose>
+      <when condition="@((int)context.Variables[\"requestLength\"] &gt; 32000)">
+        <return-response>
+          <set-status code="413" reason="Payload Too Large" />
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>{"error":"Input exceeds configured token budget."}</set-body>
+        </return-response>
+      </when>
+    </choose>
+
+    <choose>
+      <when condition="@(
+        System.Text.RegularExpressions.Regex.IsMatch(
+          (string)context.Variables[\"requestBody\"],
+          \"(?i)(ignore\\s+previous\\s+instructions|override\\s+policy|bypass\\s+safety|reveal\\s+system\\s+prompt|jailbreak)\"
+        )
+      )">
+        <return-response>
+          <set-status code="400" reason="Bad Request" />
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>{"error":"Potential prompt-injection pattern detected."}</set-body>
+        </return-response>
+      </when>
+    </choose>
+
+    <choose>
+      <when condition="@(
+        System.Text.RegularExpressions.Regex.IsMatch(
+          (string)context.Variables[\"requestBody\"],
+          \"(?i)(hate\\s+speech|kill\\s+all|harm\\s+yourself|self-harm|terrorist|genocide)\"
+        )
+      )">
+        <return-response>
+          <set-status code="403" reason="Forbidden" />
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>{"error":"Request rejected by harmful-content guardrails."}</set-body>
+        </return-response>
+      </when>
+    </choose>
+
+    <rate-limit-by-key calls="30" renewal-period="60" counter-key="@(
+      context.Request.Headers.GetValueOrDefault(\"Mcp-Session-Id\", context.Subscription?.Key ?? \"anonymous\")
+    )" />
+
+    <quota-by-key calls="1000" renewal-period="3600" counter-key="@(
+      context.Request.Headers.GetValueOrDefault(\"Mcp-Session-Id\", context.Subscription?.Key ?? \"anonymous\")
+    )" />
+
+    <set-header name="X-Content-Type-Options" exists-action="override">
+      <value>nosniff</value>
+    </set-header>
+  </inbound>
+
+  <backend>
+    <base />
+  </backend>
+
+  <outbound>
+    <base />
+  </outbound>
+
+  <on-error>
+    <base />
+  </on-error>
+</policies>

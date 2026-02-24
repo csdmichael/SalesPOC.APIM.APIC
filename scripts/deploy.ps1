@@ -143,7 +143,29 @@ $rulesetPath = Join-Path $scriptRoot "spectral\CustomRulesetPOC"
 $apimResourceId = "/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.ApiManagement/service/$ApimServiceName"
 $apiCenterResourceId = "/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.ApiCenter/services/$ApiCenterName"
 $environmentScopedId = "/workspaces/default/environments/$ApiCenterEnvironmentId"
-$definitionScopedId = "/workspaces/default/apis/$ApiId/versions/$ApiVersionId/definitions/$ApiDefinitionId"
+
+$ApiVersionIdEffective = $ApiVersionId
+if ($ApiVersionIdEffective -notmatch '^[a-zA-Z0-9-]{3,90}$') {
+    $sanitizedVersionId = ($ApiVersionIdEffective -replace '[^a-zA-Z0-9-]', '-')
+    if ([string]::IsNullOrWhiteSpace($sanitizedVersionId)) {
+        $sanitizedVersionId = "v100"
+    }
+    if ($sanitizedVersionId.Length -lt 3) {
+        $sanitizedVersionId = $sanitizedVersionId.PadRight(3, '0')
+    }
+    if ($sanitizedVersionId.Length -gt 90) {
+        $sanitizedVersionId = $sanitizedVersionId.Substring(0, 90)
+    }
+
+    if ($sanitizedVersionId -notmatch '^[a-zA-Z0-9-]{3,90}$') {
+        throw "ApiVersionId '$ApiVersionId' cannot be transformed to a valid API Center version id. Use 3-90 chars: letters, numbers, hyphen."
+    }
+
+    Write-Warning "ApiVersionId '$ApiVersionId' is invalid for API Center. Using '$sanitizedVersionId' instead."
+    $ApiVersionIdEffective = $sanitizedVersionId
+}
+
+$definitionScopedId = "/workspaces/default/apis/$ApiId/versions/$ApiVersionIdEffective/definitions/$ApiDefinitionId"
 
 Write-Step "Setting Azure subscription"
 Invoke-Az { az account set --subscription $SubscriptionId }
@@ -385,10 +407,25 @@ else {
 Write-Step "Ensuring API Center API '$ApiDisplayName' exists"
 $apicApi = $null
 try {
-    $apicApi = az apic api show --resource-group $ResourceGroupName --service-name $ApiCenterName --api-id $ApiId -o json | ConvertFrom-Json
+    $apicApi = az apic api show --resource-group $ResourceGroupName --service-name $ApiCenterName --api-id $ApiId -o json 2>$null | ConvertFrom-Json
 }
 catch {
     $apicApi = $null
+}
+
+if ($null -eq $apicApi) {
+    try {
+        $apicApis = az apic api list --resource-group $ResourceGroupName --service-name $ApiCenterName -o json 2>$null | ConvertFrom-Json
+        $caseInsensitiveMatch = $apicApis | Where-Object { $_.name -ieq $ApiId } | Select-Object -First 1
+        if ($null -ne $caseInsensitiveMatch) {
+            $ApiId = $caseInsensitiveMatch.name
+            $definitionScopedId = "/workspaces/default/apis/$ApiId/versions/$ApiVersionIdEffective/definitions/$ApiDefinitionId"
+            $apicApi = $caseInsensitiveMatch
+            Write-Host "API Center API resolved by case-insensitive match. Using API id '$ApiId'." -ForegroundColor Yellow
+        }
+    }
+    catch {
+    }
 }
 
 if ($null -eq $apicApi) {
@@ -409,7 +446,7 @@ else {
 Write-Step "Ensuring API Center API version exists"
 $apiVersion = $null
 try {
-    $apiVersion = az apic api version show --resource-group $ResourceGroupName --service-name $ApiCenterName --api-id $ApiId --version-id $ApiVersionId -o json | ConvertFrom-Json
+    $apiVersion = az apic api version show --resource-group $ResourceGroupName --service-name $ApiCenterName --api-id $ApiId --version-id $ApiVersionIdEffective -o json 2>$null | ConvertFrom-Json
 }
 catch {
     $apiVersion = $null
@@ -421,19 +458,19 @@ if ($null -eq $apiVersion) {
             --resource-group $ResourceGroupName `
             --service-name $ApiCenterName `
             --api-id $ApiId `
-            --version-id $ApiVersionId `
-            --title "Version $ApiVersionId" `
+            --version-id $ApiVersionIdEffective `
+            --title "Version $ApiVersionIdEffective" `
             --lifecycle-stage production
     }
 }
 else {
-    Write-Host "API version '$ApiVersionId' already exists. Skipping." -ForegroundColor Yellow
+    Write-Host "API version '$ApiVersionIdEffective' already exists. Skipping." -ForegroundColor Yellow
 }
 
 Write-Step "Ensuring API definition exists and importing OpenAPI only when missing"
 $definition = $null
 try {
-    $definition = az apic api definition show --resource-group $ResourceGroupName --service-name $ApiCenterName --api-id $ApiId --version-id $ApiVersionId --definition-id $ApiDefinitionId -o json | ConvertFrom-Json
+    $definition = az apic api definition show --resource-group $ResourceGroupName --service-name $ApiCenterName --api-id $ApiId --version-id $ApiVersionIdEffective --definition-id $ApiDefinitionId -o json 2>$null | ConvertFrom-Json
 }
 catch {
     $definition = $null
@@ -445,7 +482,7 @@ if ($null -eq $definition) {
             --resource-group $ResourceGroupName `
             --service-name $ApiCenterName `
             --api-id $ApiId `
-            --version-id $ApiVersionId `
+                --version-id $ApiVersionIdEffective `
             --definition-id $ApiDefinitionId `
             --title "OpenAPI"
     }
@@ -455,7 +492,7 @@ if ($null -eq $definition) {
             --resource-group $ResourceGroupName `
             --service-name $ApiCenterName `
             --api-id $ApiId `
-            --version-id $ApiVersionId `
+            --version-id $ApiVersionIdEffective `
             --definition-id $ApiDefinitionId `
             --format link `
             --value $OpenApiUrl `

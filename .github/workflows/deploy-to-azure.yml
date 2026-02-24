@@ -49,7 +49,7 @@ jobs:
             -McpServerId "sales-api-mcp" `
             -ApiCenterEnvironmentId "production" `
             -ApiCenterIntegrationName "apim-poc-my-prod" `
-            -ApiVersionId "1" `
+            -ApiVersionId "v1" `
             -ApiDefinitionId "openapi" `
             -ApiDeploymentId "production" `
             -ApiAnalyzerConfigName "customrulesetpoc"

@@ -21,10 +21,10 @@ param(
     [string]$ApiDisplayName = "SalesAPI",
 
     [Parameter(Mandatory = $false)]
-    [string]$ApiId = "SalesAPI",
+    [string]$ApiId = "salesApi",
 
     [Parameter(Mandatory = $false)]
-    [string]$ApiPath = "SalesAPI",
+    [string]$ApiPath = "salesApi",
 
     [Parameter(Mandatory = $false)]
     [string]$McpServerId = "sales-api-mcp",
@@ -135,7 +135,7 @@ function Get-ApiCenterVersionId {
     if ($candidate -notmatch '^[a-zA-Z0-9-]{3,90}$') {
         $candidate = ($candidate -replace '[^a-zA-Z0-9-]', '-')
         if ([string]::IsNullOrWhiteSpace($candidate)) {
-            $candidate = "v100"
+            $candidate = "v1"
         }
         if ($candidate.Length -lt 3) {
             $candidate = $candidate.PadRight(3, '0')

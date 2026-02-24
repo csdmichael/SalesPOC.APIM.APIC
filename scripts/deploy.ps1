@@ -18,16 +18,16 @@ param(
     [string]$OpenApiUrl = "",
 
     [Parameter(Mandatory = $false)]
-    [string]$ApiDisplayName = "SalesPOC-API",
+    [string]$ApiDisplayName = "SalesAPI",
 
     [Parameter(Mandatory = $false)]
-    [string]$ApiId = "salespoc-api",
+    [string]$ApiId = "SalesAPI",
 
     [Parameter(Mandatory = $false)]
-    [string]$ApiPath = "salespoc-api",
+    [string]$ApiPath = "SalesAPI",
 
     [Parameter(Mandatory = $false)]
-    [string]$McpServerId = "salespoc-api-mcp",
+    [string]$McpServerId = "sales-api-mcp",
 
     [Parameter(Mandatory = $false)]
     [string]$ApiCenterEnvironmentId = "production",
@@ -433,7 +433,7 @@ else {
     Write-Host "API definition '$ApiDefinitionId' already exists. Skipping create/import." -ForegroundColor Yellow
 }
 
-Write-Step "Ensuring API deployment exists (SalesPOC-API in Production environment)"
+Write-Step "Ensuring API deployment exists (SalesAPI in Production environment)"
 $deployment = $null
 try {
     $deployment = az apic api deployment show --resource-group $ResourceGroupName --service-name $ApiCenterName --api-id $ApiId --deployment-id $ApiDeploymentId -o json | ConvertFrom-Json
@@ -479,7 +479,7 @@ if ($null -eq $analyzer) {
             --service-name $ApiCenterName `
             --analyzer-config-name $ApiAnalyzerConfigName `
             --title "CustomRulesetPOC" `
-            --description "Spectral ruleset for SalesPOC-API"
+            --description "Spectral ruleset for SalesAPI"
     }
 
     if (Test-Path $rulesetPath) {

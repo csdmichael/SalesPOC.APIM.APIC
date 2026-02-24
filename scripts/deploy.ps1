@@ -484,8 +484,13 @@ try {
     $existingVersions = az apic api version list --resource-group $ResourceGroupName --service-name $ApiCenterName --api-id $ApiId -o json 2>$null | ConvertFrom-Json
     $versionMatch = $existingVersions | Where-Object { $_.name -ieq $ApiVersionId -or $_.title -ieq $ApiVersionId } | Select-Object -First 1
     if ($null -ne $versionMatch -and -not [string]::IsNullOrWhiteSpace($versionMatch.name)) {
-        $ApiCenterVersionId = $versionMatch.name
-        Write-Host "API Center version resolved from existing resources. Using version id '$ApiCenterVersionId'." -ForegroundColor Yellow
+        if ($versionMatch.name -match '^[a-zA-Z0-9-]{3,90}$') {
+            $ApiCenterVersionId = $versionMatch.name
+            Write-Host "API Center version resolved from existing resources. Using version id '$ApiCenterVersionId'." -ForegroundColor Yellow
+        }
+        else {
+            Write-Warning "Existing API Center version name '$($versionMatch.name)' is not valid for current CLI constraints. Using '$ApiCenterVersionId' as the resource id and keeping '$ApiVersionId' as display title."
+        }
     }
 }
 catch {

@@ -166,7 +166,6 @@ $rulesetPath = Join-Path $scriptRoot "spectral\CustomRulesetPOC"
 
 $apimResourceId = "/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.ApiManagement/service/$ApimServiceName"
 $apiCenterResourceId = "/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.ApiCenter/services/$ApiCenterName"
-$environmentScopedId = "/workspaces/default/environments/$ApiCenterEnvironmentId"
 
 $ApiCenterVersionId = Get-ApiCenterVersionId -VersionId $ApiVersionId
 if ($ApiCenterVersionId -ne $ApiVersionId) {
@@ -174,7 +173,17 @@ if ($ApiCenterVersionId -ne $ApiVersionId) {
 }
 Write-Host "Using API Center version id: $ApiCenterVersionId" -ForegroundColor DarkCyan
 
-$definitionScopedId = "/workspaces/default/apis/$ApiId/versions/$ApiCenterVersionId/definitions/$ApiDefinitionId"
+$environmentScopedIdCandidates = @(
+    "/workspaces/default/environments/$ApiCenterEnvironmentId",
+    "/environments/$ApiCenterEnvironmentId"
+)
+$environmentScopedId = $environmentScopedIdCandidates[0]
+
+$definitionScopedIdCandidates = @(
+    "/workspaces/default/apis/$ApiId/versions/$ApiCenterVersionId/definitions/$ApiDefinitionId",
+    "/apis/$ApiId/versions/$ApiCenterVersionId/definitions/$ApiDefinitionId"
+)
+$definitionScopedId = $definitionScopedIdCandidates[0]
 
 Write-Step "Setting Azure subscription"
 Invoke-Az { az account set --subscription $SubscriptionId }
@@ -374,6 +383,16 @@ else {
     }
 }
 
+try {
+    $resolvedEnvironment = az apic environment show --resource-group $ResourceGroupName --service-name $ApiCenterName --environment-id $ApiCenterEnvironmentId -o json 2>$null | ConvertFrom-Json
+    if ($null -ne $resolvedEnvironment -and -not [string]::IsNullOrWhiteSpace($resolvedEnvironment.id)) {
+        $environmentScopedId = $resolvedEnvironment.id
+        Write-Host "Using API Center environment id: $environmentScopedId" -ForegroundColor DarkCyan
+    }
+}
+catch {
+}
+
 Write-Step "Ensuring API Center integration to APIM exists (no overwrite)"
 $apicRootHelp = ""
 try {
@@ -428,7 +447,11 @@ if ($null -eq $apicApi) {
         $caseInsensitiveMatch = $apicApis | Where-Object { $_.name -ieq $ApiId } | Select-Object -First 1
         if ($null -ne $caseInsensitiveMatch) {
             $ApiId = $caseInsensitiveMatch.name
-            $definitionScopedId = "/workspaces/default/apis/$ApiId/versions/$ApiCenterVersionId/definitions/$ApiDefinitionId"
+            $definitionScopedIdCandidates = @(
+                "/workspaces/default/apis/$ApiId/versions/$ApiCenterVersionId/definitions/$ApiDefinitionId",
+                "/apis/$ApiId/versions/$ApiCenterVersionId/definitions/$ApiDefinitionId"
+            )
+            $definitionScopedId = $definitionScopedIdCandidates[0]
             $apicApi = $caseInsensitiveMatch
             Write-Host "API Center API resolved by case-insensitive match. Using API id '$ApiId'." -ForegroundColor Yellow
         }
@@ -511,6 +534,16 @@ if ($null -eq $definition) {
 }
 else {
     Write-Host "API definition '$ApiDefinitionId' already exists. Skipping create/import." -ForegroundColor Yellow
+}
+
+try {
+    $resolvedDefinition = az apic api definition show --resource-group $ResourceGroupName --service-name $ApiCenterName --api-id $ApiId --version-id $ApiCenterVersionId --definition-id $ApiDefinitionId -o json 2>$null | ConvertFrom-Json
+    if ($null -ne $resolvedDefinition -and -not [string]::IsNullOrWhiteSpace($resolvedDefinition.id)) {
+        $definitionScopedId = $resolvedDefinition.id
+        Write-Host "Using API Center definition id: $definitionScopedId" -ForegroundColor DarkCyan
+    }
+}
+catch {
 }
 
 Write-Step "Ensuring API deployment exists (SalesAPI in Production environment)"

@@ -36,7 +36,7 @@ param(
     [string]$ApiCenterIntegrationName = "apim-poc-my-prod",
 
     [Parameter(Mandatory = $false)]
-    [string]$ApiVersionId = "1",
+    [string]$ApiVersionId = "v10",
 
     [Parameter(Mandatory = $false)]
     [string]$ApiDefinitionId = "openapi",
@@ -135,7 +135,7 @@ function Get-ApiCenterVersionId {
     if ($candidate -notmatch '^[a-zA-Z0-9-]{3,90}$') {
         $candidate = ($candidate -replace '[^a-zA-Z0-9-]', '-')
         if ([string]::IsNullOrWhiteSpace($candidate)) {
-            $candidate = "v1"
+            $candidate = "v10"
         }
         if ($candidate.Length -lt 3) {
             $candidate = $candidate.PadRight(3, '0')

@@ -128,6 +128,30 @@ function Resolve-OpenApiUrl {
     throw "Could not find an OpenAPI endpoint for App Service '$AppServiceName'. Provide -OpenApiUrl explicitly or expose one of: /openapi/v1.json, /openapi.json, /swagger/v1/swagger.json, /swagger.json, /v3/api-docs"
 }
 
+function Get-ApiCenterVersionId {
+    param([string]$VersionId)
+
+    $candidate = $VersionId
+    if ($candidate -notmatch '^[a-zA-Z0-9-]{3,90}$') {
+        $candidate = ($candidate -replace '[^a-zA-Z0-9-]', '-')
+        if ([string]::IsNullOrWhiteSpace($candidate)) {
+            $candidate = "v100"
+        }
+        if ($candidate.Length -lt 3) {
+            $candidate = $candidate.PadRight(3, '0')
+        }
+        if ($candidate.Length -gt 90) {
+            $candidate = $candidate.Substring(0, 90)
+        }
+    }
+
+    if ($candidate -notmatch '^[a-zA-Z0-9-]{3,90}$') {
+        throw "ApiVersionId '$VersionId' cannot be transformed to a valid API Center version id. Use 3-90 chars: letters, numbers, hyphen."
+    }
+
+    return $candidate
+}
+
 if (-not (Command-Exists "az")) {
     throw "Azure CLI is required."
 }
@@ -144,31 +168,13 @@ $apimResourceId = "/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroupN
 $apiCenterResourceId = "/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.ApiCenter/services/$ApiCenterName"
 $environmentScopedId = "/workspaces/default/environments/$ApiCenterEnvironmentId"
 
-$ApiVersionIdEffective = $ApiVersionId
-if ($ApiVersionIdEffective -notmatch '^[a-zA-Z0-9-]{3,90}$') {
-    $sanitizedVersionId = ($ApiVersionIdEffective -replace '[^a-zA-Z0-9-]', '-')
-    if ([string]::IsNullOrWhiteSpace($sanitizedVersionId)) {
-        $sanitizedVersionId = "v100"
-    }
-    if ($sanitizedVersionId.Length -lt 3) {
-        $sanitizedVersionId = $sanitizedVersionId.PadRight(3, '0')
-    }
-    if ($sanitizedVersionId.Length -gt 90) {
-        $sanitizedVersionId = $sanitizedVersionId.Substring(0, 90)
-    }
-
-    if ($sanitizedVersionId -notmatch '^[a-zA-Z0-9-]{3,90}$') {
-        throw "ApiVersionId '$ApiVersionId' cannot be transformed to a valid API Center version id. Use 3-90 chars: letters, numbers, hyphen."
-    }
-
-    Write-Warning "ApiVersionId '$ApiVersionId' is invalid for API Center. Using '$sanitizedVersionId' instead."
-    $ApiVersionIdEffective = $sanitizedVersionId
+$ApiCenterVersionId = Get-ApiCenterVersionId -VersionId $ApiVersionId
+if ($ApiCenterVersionId -ne $ApiVersionId) {
+    Write-Warning "ApiVersionId '$ApiVersionId' is invalid for API Center. Using '$ApiCenterVersionId' instead."
 }
+Write-Host "Using API Center version id: $ApiCenterVersionId" -ForegroundColor DarkCyan
 
-$ApiVersionId = $ApiVersionIdEffective
-Write-Host "Using API Center version id: $ApiVersionId" -ForegroundColor DarkCyan
-
-$definitionScopedId = "/workspaces/default/apis/$ApiId/versions/$ApiVersionIdEffective/definitions/$ApiDefinitionId"
+$definitionScopedId = "/workspaces/default/apis/$ApiId/versions/$ApiCenterVersionId/definitions/$ApiDefinitionId"
 
 Write-Step "Setting Azure subscription"
 Invoke-Az { az account set --subscription $SubscriptionId }
@@ -422,7 +428,7 @@ if ($null -eq $apicApi) {
         $caseInsensitiveMatch = $apicApis | Where-Object { $_.name -ieq $ApiId } | Select-Object -First 1
         if ($null -ne $caseInsensitiveMatch) {
             $ApiId = $caseInsensitiveMatch.name
-            $definitionScopedId = "/workspaces/default/apis/$ApiId/versions/$ApiVersionIdEffective/definitions/$ApiDefinitionId"
+            $definitionScopedId = "/workspaces/default/apis/$ApiId/versions/$ApiCenterVersionId/definitions/$ApiDefinitionId"
             $apicApi = $caseInsensitiveMatch
             Write-Host "API Center API resolved by case-insensitive match. Using API id '$ApiId'." -ForegroundColor Yellow
         }
@@ -447,9 +453,10 @@ else {
 }
 
 Write-Step "Ensuring API Center API version exists"
+Write-Host "API Center version-id argument: $ApiCenterVersionId" -ForegroundColor DarkCyan
 $apiVersion = $null
 try {
-    $apiVersion = az apic api version show --resource-group $ResourceGroupName --service-name $ApiCenterName --api-id $ApiId --version-id $ApiVersionIdEffective -o json 2>$null | ConvertFrom-Json
+    $apiVersion = az apic api version show --resource-group $ResourceGroupName --service-name $ApiCenterName --api-id $ApiId --version-id $ApiCenterVersionId -o json 2>$null | ConvertFrom-Json
 }
 catch {
     $apiVersion = $null
@@ -461,19 +468,19 @@ if ($null -eq $apiVersion) {
             --resource-group $ResourceGroupName `
             --service-name $ApiCenterName `
             --api-id $ApiId `
-            --version-id $ApiVersionIdEffective `
-            --title "Version $ApiVersionIdEffective" `
+            --version-id $ApiCenterVersionId `
+            --title "Version $ApiCenterVersionId" `
             --lifecycle-stage production
     }
 }
 else {
-    Write-Host "API version '$ApiVersionIdEffective' already exists. Skipping." -ForegroundColor Yellow
+    Write-Host "API version '$ApiCenterVersionId' already exists. Skipping." -ForegroundColor Yellow
 }
 
 Write-Step "Ensuring API definition exists and importing OpenAPI only when missing"
 $definition = $null
 try {
-    $definition = az apic api definition show --resource-group $ResourceGroupName --service-name $ApiCenterName --api-id $ApiId --version-id $ApiVersionIdEffective --definition-id $ApiDefinitionId -o json 2>$null | ConvertFrom-Json
+    $definition = az apic api definition show --resource-group $ResourceGroupName --service-name $ApiCenterName --api-id $ApiId --version-id $ApiCenterVersionId --definition-id $ApiDefinitionId -o json 2>$null | ConvertFrom-Json
 }
 catch {
     $definition = $null
@@ -485,7 +492,7 @@ if ($null -eq $definition) {
             --resource-group $ResourceGroupName `
             --service-name $ApiCenterName `
             --api-id $ApiId `
-                --version-id $ApiVersionIdEffective `
+                --version-id $ApiCenterVersionId `
             --definition-id $ApiDefinitionId `
             --title "OpenAPI"
     }
@@ -495,7 +502,7 @@ if ($null -eq $definition) {
             --resource-group $ResourceGroupName `
             --service-name $ApiCenterName `
             --api-id $ApiId `
-            --version-id $ApiVersionIdEffective `
+            --version-id $ApiCenterVersionId `
             --definition-id $ApiDefinitionId `
             --format link `
             --value $OpenApiUrl `

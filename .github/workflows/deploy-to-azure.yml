@@ -43,10 +43,10 @@ jobs:
             -ApimServiceName "apim-poc-my" `
             -ApiCenterName "api-center-poc-my" `
             -AppServiceName "salespoc-api" `
-            -ApiDisplayName "SalesPOC-API" `
-            -ApiId "salespoc-api" `
-            -ApiPath "salespoc-api" `
-            -McpServerId "salespoc-api-mcp" `
+            -ApiDisplayName "SalesAPI" `
+            -ApiId "salesApi" `
+            -ApiPath "salesApi" `
+            -McpServerId "sales-api-mcp" `
             -ApiCenterEnvironmentId "production" `
             -ApiCenterIntegrationName "apim-poc-my-prod" `
             -ApiVersionId "v1" `

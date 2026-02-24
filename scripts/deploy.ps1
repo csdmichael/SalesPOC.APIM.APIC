@@ -196,10 +196,10 @@ Write-Host ("GET operations selected as MCP tools: " + ($getOps -join ", "))
 
 Write-Step "Ensuring MCP server exists (no overwrite)"
 $mcpServerUriCandidates = @(
-    "$apimResourceId/mcpServers/$McpServerId?api-version=2025-03-01-preview",
-    "$apimResourceId/mcpServers/$McpServerId?api-version=2024-10-01-preview",
-    "$apimResourceId/apis/$ApiId/mcpServers/$McpServerId?api-version=2025-03-01-preview",
-    "$apimResourceId/apis/$ApiId/mcpServers/$McpServerId?api-version=2024-10-01-preview"
+    "$apimResourceId/mcpServers/${McpServerId}?api-version=2025-03-01-preview",
+    "$apimResourceId/mcpServers/${McpServerId}?api-version=2024-10-01-preview",
+    "$apimResourceId/apis/$ApiId/mcpServers/${McpServerId}?api-version=2025-03-01-preview",
+    "$apimResourceId/apis/$ApiId/mcpServers/${McpServerId}?api-version=2024-10-01-preview"
 )
 
 $existingMcpUri = $null
